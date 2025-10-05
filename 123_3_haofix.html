@@ -37,41 +37,6 @@
             font-size: 28px;
         }
         
-        .setup-section {
-            background: #fff3cd;
-            border: 2px solid #ffc107;
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 30px;
-        }
-        
-        .setup-title {
-            color: #856404;
-            font-weight: bold;
-            margin-bottom: 10px;
-            font-size: 16px;
-        }
-        
-        .setup-input {
-            width: 100%;
-            padding: 10px;
-            border: 2px solid #ffc107;
-            border-radius: 8px;
-            font-size: 14px;
-            margin-bottom: 10px;
-        }
-        
-        .setup-input:focus {
-            outline: none;
-            border-color: #ff9800;
-        }
-        
-        .setup-note {
-            font-size: 13px;
-            color: #856404;
-            line-height: 1.5;
-        }
-        
         .recorder-section {
             text-align: center;
             margin-bottom: 30px;
@@ -219,22 +184,9 @@
     <div class="container">
         <h1>語音轉文字</h1>
         
-        <div class="setup-section">
-            <div class="setup-title">⚙️ 設定您的 n8n Webhook URL</div>
-            <input 
-                type="text" 
-                id="webhookUrl" 
-                class="setup-input"
-                placeholder="https://xyzctkite.zeabur.app/webhook/upload-notess"
-            />
-            <div class="setup-note">
-                💡 提示: 請先在 n8n 中建立工作流程,然後將 Webhook URL 貼到上方欄位中。URL 會自動儲存在瀏覽器中。
-            </div>
-        </div>
-        
         <div class="recorder-section">
             <button class="record-btn" id="recordBtn">開始錄音</button>
-            <div class="status" id="status">請先設定 Webhook URL</div>
+            <div class="status" id="status">點擊按鈕開始</div>
             <div class="timer" id="timer"></div>
         </div>
         
@@ -256,6 +208,9 @@
     </div>
 
     <script>
+        // Webhook URL 寫死在代碼中
+        const WEBHOOK_URL = 'https://xyzctkite.zeabur.app/webhook/upload-notes';
+        
         let mediaRecorder;
         let audioChunks = [];
         let isRecording = false;
@@ -263,7 +218,6 @@
         let timerInterval;
         let recordedAudioBlob = null;
         
-        const webhookUrlInput = document.getElementById('webhookUrl');
         const recordBtn = document.getElementById('recordBtn');
         const status = document.getElementById('status');
         const timer = document.getElementById('timer');
@@ -272,33 +226,6 @@
         const resultSection = document.getElementById('resultSection');
         const resultText = document.getElementById('resultText');
         const audioElement = document.getElementById('audioElement');
-        
-        // 從 localStorage 讀取儲存的 URL
-        const savedUrl = localStorage.getItem('webhookUrl');
-        if (savedUrl) {
-            webhookUrlInput.value = savedUrl;
-            updateStatus();
-        }
-        
-        // 儲存 URL 到 localStorage
-        webhookUrlInput.addEventListener('input', () => {
-            const url = webhookUrlInput.value.trim();
-            if (url) {
-                localStorage.setItem('webhookUrl', url);
-            }
-            updateStatus();
-        });
-        
-        function updateStatus() {
-            const url = webhookUrlInput.value.trim();
-            if (url) {
-                status.textContent = '點擊按鈕開始';
-                recordBtn.disabled = false;
-            } else {
-                status.textContent = '請先設定 Webhook URL';
-                recordBtn.disabled = true;
-            }
-        }
         
         recordBtn.addEventListener('click', toggleRecording);
         
@@ -311,13 +238,6 @@
         }
         
         async function startRecording() {
-            const webhookUrl = webhookUrlInput.value.trim();
-            
-            if (!webhookUrl) {
-                showError('請先輸入 Webhook URL');
-                return;
-            }
-            
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ 
                     audio: true
@@ -333,7 +253,7 @@
                 mediaRecorder.onstop = async () => {
                     const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
                     recordedAudioBlob = audioBlob;
-                    await uploadAudio(audioBlob, webhookUrl);
+                    await uploadAudio(audioBlob);
                 };
                 
                 mediaRecorder.start();
@@ -349,7 +269,7 @@
                 timerInterval = setInterval(updateTimer, 100);
                 
             } catch (err) {
-                showError('無法存取麥克風');
+                showError('無法存取麥克風，請確認已授予權限');
             }
         }
         
@@ -376,14 +296,14 @@
             timer.textContent = `${String(min).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
         }
         
-        async function uploadAudio(audioBlob, webhookUrl) {
+        async function uploadAudio(audioBlob) {
             loading.classList.add('show');
             
             try {
                 const formData = new FormData();
                 formData.append('audio_file', audioBlob, 'recording.webm');
                 
-                const response = await fetch(webhookUrl, {
+                const response = await fetch(WEBHOOK_URL, {
                     method: 'POST',
                     body: formData
                 });
@@ -410,7 +330,7 @@
                         audioElement.src = audioUrl;
                     }
                 } else {
-                    showError('轉換失敗,請檢查您的 n8n 工作流程設定');
+                    showError('轉換失敗，請稍後再試');
                     status.textContent = '點擊按鈕開始';
                 }
                 
@@ -418,7 +338,7 @@
                 loading.classList.remove('show');
                 recordBtn.disabled = false;
                 recordBtn.textContent = '開始錄音';
-                showError('發生錯誤: ' + err.message + ' - 請確認 Webhook URL 是否正確');
+                showError('發生錯誤: ' + err.message);
                 status.textContent = '點擊按鈕開始';
                 timer.textContent = '';
             }
